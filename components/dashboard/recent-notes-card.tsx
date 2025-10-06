@@ -1,10 +1,19 @@
 "use client"
 
 import { motion } from "framer-motion"
-import { recentNotes } from "@/lib/seed-data"
 import { FileText, ChevronRight } from "lucide-react"
 
-export function RecentNotesCard() {
+interface RecentNotesCardProps {
+  notes?: Array<{
+    id: string
+    title: string
+    preview: string
+    className: string
+    timestamp: string
+  }>
+}
+
+export function RecentNotesCard({ notes = [] }: RecentNotesCardProps) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 4, scale: 0.96 }}
@@ -18,7 +27,10 @@ export function RecentNotesCard() {
       </div>
 
       <div className="space-y-2">
-        {recentNotes.slice(0, 3).map((note) => (
+        {notes.length === 0 && (
+          <p className="text-sm text-[#8D93A1] text-center py-4">No notes yet</p>
+        )}
+        {notes.slice(0, 3).map((note) => (
           <button
             key={note.id}
             className="w-full text-left p-2.5 rounded-lg bg-[#0A0A0C]/50 border border-border/50 hover:border-[#EB1F3A]/30 transition-all group"

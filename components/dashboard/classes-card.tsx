@@ -1,11 +1,20 @@
 "use client"
 
 import { motion } from "framer-motion"
-import { classes } from "@/lib/seed-data"
 import { Plus } from "lucide-react"
 import Link from "next/link"
 
-export function ClassesCard() {
+interface ClassesCardProps {
+  classes?: Array<{
+    id: string
+    name: string
+    color: string
+    progress?: number
+    teacher?: string
+  }>
+}
+
+export function ClassesCard({ classes = [] }: ClassesCardProps) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 4, scale: 0.96 }}

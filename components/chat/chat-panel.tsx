@@ -30,7 +30,7 @@ export function ChatPanel({ agent, quickChips = [], className, allAgents, onAgen
   const [input, setInput] = useState("")
   const [isMinimized, setIsMinimized] = useState(false)
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!input.trim()) return
 
     const userMessage: Message = {
@@ -43,16 +43,41 @@ export function ChatPanel({ agent, quickChips = [], className, allAgents, onAgen
     setMessages([...messages, userMessage])
     setInput("")
 
-    // Simulate assistant response
-    setTimeout(() => {
+    try {
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: input,
+          threadId: agent.threadId,
+          agentId: agent.id,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to send message")
+      }
+
+      const data = await response.json()
+      
       const assistantMessage: Message = {
+        id: data.messageId || (Date.now() + 1).toString(),
+        role: "assistant",
+        content: data.content,
+        timestamp: new Date(data.timestamp || Date.now()),
+      }
+      
+      setMessages((prev) => [...prev, assistantMessage])
+    } catch (error) {
+      console.error("Error sending message:", error)
+      const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: `I'm ${agent.name}, and I'm here to help! This is a simulated response.`,
+        content: "Sorry, I encountered an error. Please try again.",
         timestamp: new Date(),
       }
-      setMessages((prev) => [...prev, assistantMessage])
-    }, 1000)
+      setMessages((prev) => [...prev, errorMessage])
+    }
   }
 
   const handleQuickChip = (chip: { label: string; action: string }) => {
