@@ -7,9 +7,10 @@ interface AgentAvatarProps {
   agent: Agent
   size?: "sm" | "md" | "lg"
   showStatus?: boolean
+  className?: string
 }
 
-export function AgentAvatar({ agent, size = "md", showStatus = false }: AgentAvatarProps) {
+export function AgentAvatar({ agent, size = "md", showStatus = false, className = "" }: AgentAvatarProps) {
   const sizeClasses = {
     sm: "w-6 h-6",
     md: "w-10 h-10",
@@ -23,7 +24,7 @@ export function AgentAvatar({ agent, size = "md", showStatus = false }: AgentAva
   }
 
   return (
-    <div className="relative">
+    <div className={`relative ${className}`}>
       <motion.div
         className={`${sizeClasses[size]} rounded-full flex items-center justify-center relative overflow-hidden`}
         whileHover={{ scale: 1.05 }}

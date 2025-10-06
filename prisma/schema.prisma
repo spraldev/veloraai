@@ -1,0 +1,235 @@
+generator client {
+  provider = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  extensions = [pgvector(map: "vector")]
+}
+
+model User {
+  id                    String    @id @default(cuid())
+  name                  String?
+  email                 String    @unique
+  emailVerified         DateTime?
+  image                 String?
+  googleId              String?   @unique
+  onboardingComplete    Boolean   @default(false)
+  preferences           Json?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  accounts              Account[]
+  sessions              Session[]
+  classes               Class[]
+  threads               Thread[]
+  studyBriefs           StudyBrief[]
+  notificationSubscriptions NotificationSubscription[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Class {
+  id                  String    @id @default(cuid())
+  userId              String
+  name                String
+  teacher             String?
+  color               String
+  progress            Int       @default(0)
+  googleClassroomId   String?   @unique
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  materials           Material[]
+  notes               Note[]
+  assignments         Assignment[]
+  studyBlocks         StudyBlock[]
+  practiceSets        PracticeSet[]
+  events              Event[]
+}
+
+model Material {
+  id          String    @id @default(cuid())
+  classId     String
+  type        String
+  title       String
+  source      String
+  content     String?   @db.Text
+  filePath    String?
+  duration    String?
+  metadata    Json?
+  embedding   Unsupported("vector(1536)")?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  class       Class     @relation(fields: [classId], references: [id], onDelete: Cascade)
+  notes       Note[]
+  events      Event[]
+}
+
+model Note {
+  id          String    @id @default(cuid())
+  classId     String
+  materialId  String?
+  title       String
+  content     String    @db.Text
+  outline     Json?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  class       Class     @relation(fields: [classId], references: [id], onDelete: Cascade)
+  material    Material? @relation(fields: [materialId], references: [id], onDelete: SetNull)
+}
+
+model Assignment {
+  id                  String    @id @default(cuid())
+  classId             String
+  title               String
+  description         String?   @db.Text
+  dueDate             DateTime
+  type                String
+  weight              String
+  completed           Boolean   @default(false)
+  googleClassroomId   String?   @unique
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  class               Class     @relation(fields: [classId], references: [id], onDelete: Cascade)
+}
+
+model StudyBrief {
+  id          String    @id @default(cuid())
+  userId      String
+  date        DateTime
+  summary     String    @db.Text
+  totalTime   String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  blocks      StudyBlock[]
+
+  @@unique([userId, date])
+}
+
+model StudyBlock {
+  id          String    @id @default(cuid())
+  briefId     String
+  classId     String?
+  subject     String
+  duration    Int
+  method      String
+  topic       String
+  order       Int
+  completed   Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  brief       StudyBrief @relation(fields: [briefId], references: [id], onDelete: Cascade)
+  class       Class?     @relation(fields: [classId], references: [id], onDelete: SetNull)
+}
+
+model PracticeSet {
+  id          String    @id @default(cuid())
+  classId     String
+  title       String
+  difficulty  String
+  questions   Int
+  progress    Int       @default(0)
+  lastAttempt DateTime?
+  concepts    String[]
+  questionsData Json?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  class       Class     @relation(fields: [classId], references: [id], onDelete: Cascade)
+}
+
+model Thread {
+  id            String    @id @default(cuid())
+  userId        String
+  agentType     String
+  agentId       String
+  title         String
+  pinned        Boolean   @default(false)
+  lastActivity  DateTime  @default(now())
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages      Message[]
+}
+
+model Message {
+  id          String    @id @default(cuid())
+  threadId    String
+  role        String
+  content     String    @db.Text
+  toolCalls   Json?
+  createdAt   DateTime  @default(now())
+
+  thread      Thread    @relation(fields: [threadId], references: [id], onDelete: Cascade)
+}
+
+model Event {
+  id          String    @id @default(cuid())
+  classId     String
+  materialId  String?
+  type        String
+  date        DateTime
+  topic       String
+  confidence  Float
+  metadata    Json?
+  createdAt   DateTime  @default(now())
+
+  class       Class     @relation(fields: [classId], references: [id], onDelete: Cascade)
+  material    Material? @relation(fields: [materialId], references: [id], onDelete: SetNull)
+}
+
+model NotificationSubscription {
+  id          String    @id @default(cuid())
+  userId      String
+  endpoint    String
+  keys        Json
+  createdAt   DateTime  @default(now())
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, endpoint])
+}

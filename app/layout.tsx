@@ -7,6 +7,7 @@ import "./globals.css"
 import { Sidebar } from "@/components/sidebar"
 import { TopBar } from "@/components/top-bar"
 import { Suspense } from "react"
+import { SessionProvider } from "@/components/session-provider"
 
 export const metadata: Metadata = {
   title: "Velora - AI Study Management",
@@ -22,11 +23,13 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable}`}>
-        <Suspense fallback={<div>Loading...</div>}>
-          <Sidebar />
-          <TopBar />
-          <main className="ml-[280px] mt-16 min-h-screen">{children}</main>
-        </Suspense>
+        <SessionProvider>
+          <Suspense fallback={<div>Loading...</div>}>
+            <Sidebar />
+            <TopBar />
+            <main className="ml-[280px] mt-16 min-h-screen">{children}</main>
+          </Suspense>
+        </SessionProvider>
         <Analytics />
       </body>
     </html>
