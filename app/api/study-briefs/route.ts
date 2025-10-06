@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { generateStudyBrief } from "@/lib/services/study-brief"
 
 export async function GET(request: NextRequest) {
   try {
@@ -76,22 +77,24 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { date, summary, totalTime, blocks } = body
+    const { date, summary, totalTime, blocks, focusAreas } = body
 
     if (!date) {
       return NextResponse.json({ error: "date is required" }, { status: 400 })
     }
 
-    const brief = await prisma.studyBrief.create({
-      data: {
-        userId: user.id,
-        date: new Date(date),
-        summary: summary || "",
-        totalTime: totalTime || 0,
-      },
-    })
-
+    let createdBrief
+    
     if (blocks && blocks.length > 0) {
+      const brief = await prisma.studyBrief.create({
+        data: {
+          userId: user.id,
+          date: new Date(date),
+          summary: summary || "",
+          totalTime: totalTime || "0 min",
+        },
+      })
+
       await prisma.studyBlock.createMany({
         data: blocks.map((block: any, index: number) => ({
           briefId: brief.id,
@@ -104,25 +107,46 @@ export async function POST(request: NextRequest) {
           completed: false,
         })),
       })
-    }
 
-    const createdBrief = await prisma.studyBrief.findUnique({
-      where: { id: brief.id },
-      include: {
-        blocks: {
-          include: {
-            class: {
-              select: {
-                id: true,
-                name: true,
-                color: true,
+      createdBrief = await prisma.studyBrief.findUnique({
+        where: { id: brief.id },
+        include: {
+          blocks: {
+            include: {
+              class: {
+                select: {
+                  id: true,
+                  name: true,
+                  color: true,
+                },
               },
             },
+            orderBy: { order: 'asc' },
           },
-          orderBy: { order: 'asc' },
         },
-      },
-    })
+      })
+    } else {
+      const targetDate = new Date(date)
+      const brief = await generateStudyBrief(user.id, targetDate, focusAreas)
+      
+      createdBrief = await prisma.studyBrief.findUnique({
+        where: { id: brief.id },
+        include: {
+          blocks: {
+            include: {
+              class: {
+                select: {
+                  id: true,
+                  name: true,
+                  color: true,
+                },
+              },
+            },
+            orderBy: { order: 'asc' },
+          },
+        },
+      })
+    }
 
     return NextResponse.json(createdBrief, { status: 201 })
   } catch (error) {

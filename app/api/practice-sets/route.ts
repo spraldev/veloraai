@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { generateQuiz } from "@/lib/services/quiz-generation"
 
 export async function GET(request: NextRequest) {
   try {
@@ -79,11 +80,11 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { classId, title, difficulty, questions, concepts } = body
+    const { classId, title, difficulty, questionsData, topic, numQuestions } = body
 
-    if (!classId || !title || !questions) {
+    if (!classId) {
       return NextResponse.json(
-        { error: "classId, title, and questions are required" },
+        { error: "classId is required" },
         { status: 400 }
       )
     }
@@ -96,17 +97,45 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Class not found" }, { status: 404 })
     }
 
-    const practiceSet = await prisma.practiceSet.create({
-      data: {
+    let practiceSet
+
+    if (questionsData && questionsData.length > 0) {
+      practiceSet = await prisma.practiceSet.create({
+        data: {
+          classId,
+          title: title || `${classData.name} Practice`,
+          difficulty: difficulty || "medium",
+          questions: questionsData.length,
+          questionsData,
+        },
+      })
+    } else if (topic && numQuestions) {
+      const quiz = await generateQuiz(
+        user.id,
         classId,
-        title,
-        difficulty: difficulty || "medium",
-        questions,
-        progress: 0,
-        lastAttempt: null,
-        concepts: concepts || [],
-      },
-    })
+        topic,
+        numQuestions,
+        difficulty || "medium"
+      )
+      
+      practiceSet = await prisma.practiceSet.findUnique({
+        where: { id: quiz.id },
+        include: {
+          class: {
+            select: {
+              id: true,
+              name: true,
+              color: true,
+            },
+          },
+        },
+      })
+    } else {
+      return NextResponse.json(
+        { error: "Either questionsData or (topic and numQuestions) are required" },
+        { status: 400 }
+      )
+    }
 
     return NextResponse.json(practiceSet, { status: 201 })
   } catch (error) {
