@@ -3,9 +3,41 @@
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Clock, Sparkles, Calendar, Zap } from "lucide-react"
-import { studyBrief } from "@/lib/seed-data"
 
-export function StudyBriefCard() {
+interface StudyBriefProps {
+  brief?: {
+    id: string
+    summary: string
+    totalTime: string
+    blocks: Array<{
+      id: string
+      subject: string
+      method: string
+      topic: string
+      duration: number
+    }>
+  }
+}
+
+export function StudyBriefCard({ brief }: StudyBriefProps) {
+  if (!brief) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 4, scale: 0.96 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.3 }}
+        className="relative p-5 rounded-2xl bg-[#151517] border border-border shadow-gem"
+      >
+        <div className="relative z-10">
+          <h2 className="text-xl font-semibold mb-2">No study brief yet</h2>
+          <p className="text-sm text-[#8D93A1] mb-4">
+            Chat with Velora to generate your daily study plan
+          </p>
+        </div>
+      </motion.div>
+    )
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 4, scale: 0.96 }}
@@ -36,11 +68,11 @@ export function StudyBriefCard() {
       <div className="relative z-10">
         <div className="mb-4">
           <h2 className="text-xl font-semibold mb-1.5 text-balance">Today's Study Brief</h2>
-          <p className="text-xs text-[#C9CDD6] leading-relaxed">{studyBrief.summary}</p>
+          <p className="text-xs text-[#C9CDD6] leading-relaxed">{brief.summary}</p>
         </div>
 
         <div className="space-y-2 mb-4">
-          {studyBrief.blocks.map((block, index) => (
+          {brief.blocks.map((block, index) => (
             <div key={block.id} className="p-3 rounded-lg bg-[#0A0A0C]/50 border border-border/50">
               <div className="flex items-start gap-3 mb-2">
                 <div className="flex-shrink-0 w-7 h-7 rounded-full bg-[#EB1F3A]/10 flex items-center justify-center text-[#EB1F3A] text-xs font-semibold">
@@ -98,7 +130,7 @@ export function StudyBriefCard() {
         {/* Total time */}
         <div className="pt-3 border-t border-border/50 flex items-center justify-between">
           <span className="text-xs text-[#8D93A1]">Total estimated time</span>
-          <span className="text-sm font-semibold text-[#F5F7FA]">{studyBrief.totalTime}</span>
+          <span className="text-sm font-semibold text-[#F5F7FA]">{brief.totalTime}</span>
         </div>
       </div>
     </motion.div>

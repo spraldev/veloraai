@@ -3,12 +3,22 @@
 import { useState } from "react"
 import { motion } from "framer-motion"
 import { Badge } from "@/components/ui/badge"
-import { upcomingAssignments } from "@/lib/seed-data"
 import { AlertCircle } from "lucide-react"
 
 const filters = ["All", "Quizzes", "Assignments"]
 
-export function DueSoonCard() {
+interface DueSoonCardProps {
+  assignments?: Array<{
+    id: string
+    title: string
+    className: string
+    dueDate: string
+    weight: string
+    isOverdue?: boolean
+  }>
+}
+
+export function DueSoonCard({ assignments = [] }: DueSoonCardProps) {
   const [activeFilter, setActiveFilter] = useState("All")
 
   return (
@@ -39,7 +49,7 @@ export function DueSoonCard() {
       </div>
 
       <div className="space-y-2">
-        {upcomingAssignments.slice(0, 4).map((assignment) => (
+        {assignments.slice(0, 4).map((assignment) => (
           <div
             key={assignment.id}
             className={`p-2.5 rounded-lg border transition-all hover:border-[#EB1F3A]/30 ${

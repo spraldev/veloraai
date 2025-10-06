@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation"
 import { ChatPanel } from "@/components/chat/chat-panel"
-import { agents } from "@/lib/agent-data"
 import { StudyBriefCard } from "@/components/dashboard/study-brief-card"
 import { DueSoonCard } from "@/components/dashboard/due-soon-card"
 import { ClassesCard } from "@/components/dashboard/classes-card"
@@ -19,19 +18,120 @@ export default async function DashboardPage() {
 
   const user = await prisma.user.findUnique({
     where: { email: session.user.email! },
+    include: {
+      classes: {
+        include: {
+          _count: {
+            select: { materials: true, assignments: true },
+          },
+        },
+      },
+    },
   })
 
-  if (!user?.onboardingComplete) {
+  if (!user) {
+    redirect("/login")
+  }
+
+  if (!user.onboardingComplete) {
     redirect("/onboarding")
   }
 
-  const velora = agents.find((a) => a.type === "velora")!
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  
+  const todayBrief = await prisma.studyBrief.findFirst({
+    where: {
+      userId: user.id,
+      date: {
+        gte: today,
+        lt: new Date(today.getTime() + 24 * 60 * 60 * 1000),
+      },
+    },
+    include: {
+      blocks: {
+        include: { class: true },
+        orderBy: { order: "asc" },
+      },
+    },
+  })
+
+  const upcomingAssignments = await prisma.assignment.findMany({
+    where: {
+      class: { userId: user.id },
+      dueDate: { gte: new Date() },
+      completed: false,
+    },
+    include: { class: true },
+    orderBy: { dueDate: "asc" },
+    take: 5,
+  })
+
+  const threads = await prisma.thread.findMany({
+    where: { userId: user.id },
+    orderBy: { updatedAt: "desc" },
+  })
+
+  const veloraThread = threads.find(t => t.agentType === "velora")
+
+  const velora = {
+    id: veloraThread?.id || "velora",
+    name: "Velora",
+    type: "velora" as const,
+    description: "Your AI study coordinator",
+    threadId: veloraThread?.id,
+  }
 
   const quickChips = [
     { label: "Plan Today", action: "plan-today" },
     { label: "Reschedule Tonight", action: "reschedule" },
     { label: "Generate Mixed Practice", action: "generate-practice" },
   ]
+
+  const briefData = todayBrief ? {
+    id: todayBrief.id,
+    summary: todayBrief.summary,
+    totalTime: todayBrief.totalTime,
+    blocks: todayBrief.blocks.map(b => ({
+      id: b.id,
+      subject: b.subject,
+      method: b.method,
+      topic: b.topic,
+      duration: b.duration,
+    })),
+  } : undefined
+
+  const assignmentsData = upcomingAssignments.map(a => ({
+    id: a.id,
+    title: a.title,
+    className: a.class.name,
+    dueDate: a.dueDate.toLocaleDateString(),
+    weight: a.weight > 80 ? "High" : a.weight > 50 ? "Med" : "Low",
+    isOverdue: a.dueDate < new Date(),
+  }))
+
+  const classesData = user.classes.map(c => ({
+    id: c.id,
+    name: c.name,
+    color: c.color,
+    progress: 0,
+    teacher: "",
+  }))
+
+  const recentNotes = await prisma.note.findMany({
+    where: { userId: user.id },
+    include: { class: true },
+    orderBy: { createdAt: "desc" },
+    take: 3,
+  })
+
+  const notesData = recentNotes.map(n => ({
+    id: n.id,
+    title: n.title,
+    preview: n.content.substring(0, 100),
+    className: n.class.name,
+    timestamp: n.createdAt.toLocaleDateString(),
+  }))
 
   return (
     <div className="flex h-screen">
@@ -46,19 +146,19 @@ export default async function DashboardPage() {
 
           <div className="space-y-4">
             {/* Study Brief Hero */}
-            <StudyBriefCard />
+            <StudyBriefCard brief={briefData} />
 
             {/* Due Soon */}
-            <DueSoonCard />
+            <DueSoonCard assignments={assignmentsData} />
 
             {/* Classes */}
-            <ClassesCard />
+            <ClassesCard classes={classesData} />
 
             {/* Capture */}
-            <CaptureCard />
+            <CaptureCard classes={classesData.map(c => ({ id: c.id, name: c.name }))} />
 
             {/* Recent Notes */}
-            <RecentNotesCard />
+            <RecentNotesCard notes={notesData} />
 
             {/* Focus Timer */}
             <FocusTimerCard />

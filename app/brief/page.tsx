@@ -1,230 +1,146 @@
-"use client"
-import { useState } from "react"
+import { redirect } from "next/navigation"
+import { Clock, Sparkles, ChevronDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { ChatPanel } from "@/components/chat/chat-panel"
-import { agents } from "@/lib/agent-data"
-import { Play, Clock, GripVertical, Plus, Minus, Sparkles } from "lucide-react"
-import { motion } from "framer-motion"
+import { auth } from "@/lib/auth"
+import { prisma } from "@/lib/prisma"
 
-const todayBlocks = [
-  {
-    id: "1",
-    subject: "AP Biology",
-    duration: 60,
-    method: "Retrieval",
-    topic: "Cellular Respiration",
-    color: "#37E08D",
-  },
-  {
-    id: "2",
-    subject: "AP Calculus AB",
-    duration: 45,
-    method: "Mixed Practice",
-    topic: "Derivatives",
-    color: "#FFC857",
-  },
-  {
-    id: "3",
-    subject: "English Lit",
-    duration: 30,
-    method: "Reading",
-    topic: "Chapter 12",
-    color: "#FF4D57",
-  },
-]
+export default async function BriefPage() {
+  const session = await auth()
 
-const tomorrowBlocks = [
-  {
-    id: "4",
-    subject: "US History",
-    duration: 40,
-    method: "Review",
-    topic: "Civil War Era",
-    color: "#EB1F3A",
-  },
-  {
-    id: "5",
-    subject: "AP Biology",
-    duration: 30,
-    method: "Worked Examples",
-    topic: "Lab Report Prep",
-    color: "#37E08D",
-  },
-]
+  if (!session?.user?.email) {
+    redirect("/login")
+  }
 
-export default function BriefPage() {
-  const [intensity, setIntensity] = useState(50)
-  const totalToday = todayBlocks.reduce((sum, block) => sum + block.duration, 0)
-  const totalTomorrow = tomorrowBlocks.reduce((sum, block) => sum + block.duration, 0)
+  const user = await prisma.user.findUnique({
+    where: { email: session.user.email },
+  })
 
-  const velora = agents.find((a) => a.type === "velora")!
+  if (!user) {
+    redirect("/login")
+  }
 
-  const quickChips = [
-    { label: "Adjust intensity", action: "adjust" },
-    { label: "Reschedule block", action: "reschedule" },
-    { label: "Add study block", action: "add-block" },
-  ]
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  const todayBrief = await prisma.studyBrief.findFirst({
+    where: {
+      userId: user.id,
+      date: {
+        gte: today,
+        lt: new Date(today.getTime() + 24 * 60 * 60 * 1000),
+      },
+    },
+    include: {
+      blocks: {
+        include: { class: true },
+        orderBy: { order: "asc" },
+      },
+    },
+  })
+
+  const briefDate = today.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
 
   return (
-    <div className="flex h-screen">
-      {/* Main content area */}
-      <div className="flex-1 p-8 overflow-y-auto">
-        <div className="max-w-[1280px] mx-auto">
-          {/* Header */}
-          <div className="mb-8">
-            <h1 className="text-3xl font-semibold mb-2 text-balance">Study Brief</h1>
-            <p className="text-[#8D93A1]">Your personalized daily study plan</p>
+    <div className="min-h-screen p-8">
+      <div className="max-w-[800px] mx-auto">
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-2">
+            <h1 className="text-3xl font-semibold">Today's Study Brief</h1>
+            <Button variant="outline" className="border-border bg-transparent text-[#8D93A1]">
+              <Sparkles className="w-4 h-4 mr-2" />
+              Regenerate
+            </Button>
           </div>
-
-          {/* Intensity slider */}
-          <div className="mb-8 p-6 rounded-2xl bg-[#151517] border border-border shadow-gem">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="text-lg font-semibold mb-1">Plan Intensity</h3>
-                <p className="text-sm text-[#8D93A1]">Adjust study duration to fit your schedule</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="border-border bg-transparent text-[#C9CDD6]"
-                  onClick={() => setIntensity(Math.max(0, intensity - 10))}
-                >
-                  <Minus className="w-4 h-4" />
-                </Button>
-                <span className="text-lg font-semibold w-16 text-center">{intensity}%</span>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="border-border bg-transparent text-[#C9CDD6]"
-                  onClick={() => setIntensity(Math.min(100, intensity + 10))}
-                >
-                  <Plus className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
-            <div className="relative h-2 bg-[#26262A] rounded-full overflow-hidden">
-              <motion.div
-                className="absolute left-0 top-0 h-full bg-gradient-to-r from-[#37E08D] via-[#FFC857] to-[#EB1F3A] rounded-full"
-                initial={{ width: "50%" }}
-                animate={{ width: `${intensity}%` }}
-                transition={{ duration: 0.3 }}
-              />
-            </div>
-          </div>
-
-          {/* Two column layout */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Today */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-2xl font-semibold mb-1">Today</h2>
-                  <p className="text-sm text-[#8D93A1]">
-                    {todayBlocks.length} blocks • {Math.floor(totalToday / 60)}h {totalToday % 60}m total
-                  </p>
-                </div>
-                <Button className="bg-[#EB1F3A] hover:bg-[#FF4D57] text-white font-medium">
-                  <Play className="w-4 h-4 mr-2" />
-                  Start Plan
-                </Button>
-              </div>
-
-              <div className="space-y-3">
-                {todayBlocks.map((block, index) => (
-                  <motion.div
-                    key={block.id}
-                    initial={{ opacity: 0, y: 4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.1 }}
-                    className="group p-4 rounded-xl bg-[#151517] border border-border shadow-gem hover:border-[#EB1F3A]/30 transition-all cursor-move"
-                  >
-                    <div className="flex items-start gap-3">
-                      <GripVertical className="w-5 h-5 text-[#8D93A1] flex-shrink-0 mt-1 opacity-0 group-hover:opacity-100 transition-opacity" />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-2">
-                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: block.color }} />
-                          <h4 className="text-sm font-semibold text-[#F5F7FA]">{block.subject}</h4>
-                          <Badge
-                            className="text-xs border-0"
-                            style={{ backgroundColor: `${block.color}15`, color: block.color }}
-                          >
-                            {block.method}
-                          </Badge>
-                        </div>
-                        <p className="text-sm text-[#C9CDD6] mb-2">{block.topic}</p>
-                        <div className="flex items-center gap-2 text-xs text-[#8D93A1]">
-                          <Clock className="w-3 h-3" />
-                          <span>{block.duration} minutes</span>
-                        </div>
-                      </div>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-
-              <Button variant="outline" className="w-full border-border bg-transparent text-[#C9CDD6]">
-                <Plus className="w-4 h-4 mr-2" />
-                Add Block
-              </Button>
-            </div>
-
-            {/* Tomorrow */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-2xl font-semibold mb-1">Tomorrow</h2>
-                  <p className="text-sm text-[#8D93A1]">
-                    {tomorrowBlocks.length} blocks • {Math.floor(totalTomorrow / 60)}h {totalTomorrow % 60}m total
-                  </p>
-                </div>
-                <Badge className="bg-[#8D93A1]/10 text-[#8D93A1] border-0">Preview</Badge>
-              </div>
-
-              <div className="space-y-3 opacity-60">
-                {tomorrowBlocks.map((block, index) => (
-                  <motion.div
-                    key={block.id}
-                    initial={{ opacity: 0, y: 4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.1 + 0.3 }}
-                    className="p-4 rounded-xl bg-[#151517] border border-border shadow-gem"
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-2">
-                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: block.color }} />
-                          <h4 className="text-sm font-semibold text-[#F5F7FA]">{block.subject}</h4>
-                          <Badge
-                            className="text-xs border-0"
-                            style={{ backgroundColor: `${block.color}15`, color: block.color }}
-                          >
-                            {block.method}
-                          </Badge>
-                        </div>
-                        <p className="text-sm text-[#C9CDD6] mb-2">{block.topic}</p>
-                        <div className="flex items-center gap-2 text-xs text-[#8D93A1]">
-                          <Clock className="w-3 h-3" />
-                          <span>{block.duration} minutes</span>
-                        </div>
-                      </div>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-
-              <Button variant="outline" className="w-full border-border bg-transparent text-[#8D93A1]" disabled>
-                <Sparkles className="w-4 h-4 mr-2" />
-                Editable after 6pm
-              </Button>
-            </div>
-          </div>
+          <p className="text-[#8D93A1]">
+            {briefDate} • Total: {todayBrief?.totalTime || 0} minutes
+          </p>
         </div>
-      </div>
 
-      {/* Docked Chat Panel */}
-      <ChatPanel agent={velora} quickChips={quickChips} className="w-[400px] shrink-0" />
+        {todayBrief ? (
+          <>
+            <div className="p-6 rounded-2xl bg-[#151517] border border-border shadow-gem mb-6">
+              <h2 className="text-lg font-semibold mb-3">Summary</h2>
+              <p className="text-[#C9CDD6] leading-relaxed">{todayBrief.summary}</p>
+            </div>
+
+            <div className="space-y-4">
+              {todayBrief.blocks.map((block, index) => (
+                <div
+                  key={block.id}
+                  className="p-5 rounded-2xl bg-[#151517] border border-border shadow-gem hover:border-[#EB1F3A]/30 transition-all"
+                >
+                  <div className="flex items-start gap-4">
+                    <div
+                      className="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center font-semibold"
+                      style={{ backgroundColor: `${block.class.color}15`, color: block.class.color }}
+                    >
+                      {index + 1}
+                    </div>
+
+                    <div className="flex-1">
+                      <div className="flex items-start justify-between mb-2">
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span
+                              className="w-2 h-2 rounded-full"
+                              style={{ backgroundColor: block.class.color }}
+                            />
+                            <h3 className="text-base font-semibold text-[#F5F7FA]">{block.subject}</h3>
+                          </div>
+                          <Badge className="bg-[#8D93A1]/10 text-[#8D93A1] border-0 mb-2">{block.method}</Badge>
+                          <p className="text-sm text-[#C9CDD6]">{block.topic}</p>
+                        </div>
+                        <div className="flex items-center gap-2 text-[#C9CDD6]">
+                          <Clock className="w-4 h-4" />
+                          <span className="text-sm font-medium">{block.duration} min</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 mt-3">
+                        <button className="text-xs text-[#8D93A1] hover:text-[#EB1F3A] transition-colors">
+                          /shorter
+                        </button>
+                        <button className="text-xs text-[#8D93A1] hover:text-[#EB1F3A] transition-colors">
+                          /longer
+                        </button>
+                        <button className="text-xs text-[#8D93A1] hover:text-[#EB1F3A] transition-colors">
+                          /skip
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-8 flex items-center justify-between p-5 rounded-2xl bg-[#151517] border border-border shadow-gem">
+              <div className="flex items-center gap-3">
+                <Button className="bg-[#EB1F3A] hover:bg-[#FF4D57] text-white font-medium">Start Plan</Button>
+                <Button variant="outline" className="border-border bg-transparent text-[#8D93A1]">
+                  Generate Practice
+                </Button>
+              </div>
+              <Button variant="ghost" className="text-[#8D93A1]">
+                <ChevronDown className="w-4 h-4 mr-2" />
+                More Options
+              </Button>
+            </div>
+          </>
+        ) : (
+          <div className="p-12 rounded-2xl bg-[#151517] border border-border shadow-gem text-center">
+            <div className="w-16 h-16 rounded-full bg-[#EB1F3A]/10 flex items-center justify-center mx-auto mb-4">
+              <Sparkles className="w-8 h-8 text-[#EB1F3A]" />
+            </div>
+            <h3 className="text-xl font-semibold mb-2">No brief yet</h3>
+            <p className="text-[#8D93A1] mb-6">Generate a study brief for today</p>
+            <Button className="bg-[#EB1F3A] hover:bg-[#FF4D57] text-white font-medium">
+              <Sparkles className="w-4 h-4 mr-2" />
+              Generate Brief
+            </Button>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
